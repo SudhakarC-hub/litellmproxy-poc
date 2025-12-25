@@ -1,0 +1,10 @@
+google-adk
+fastapi
+uvicorn[standard]
+python-multipart
+pymupdf
+python-dotenv
+ollama
+pydantic
+pydantic-settings
+litellm

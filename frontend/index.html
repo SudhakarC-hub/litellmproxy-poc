@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Summarizer Agent</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="background-gradient"></div>
+    
+    <div class="container">
+        <header class="header">
+            <div class="logo">
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="40" height="40" rx="12" fill="url(#gradient)"/>
+                    <path d="M12 14C12 12.8954 12.8954 12 14 12H20C21.1046 12 22 12.8954 22 14V28H14C12.8954 28 12 27.1046 12 26V14Z" fill="white" opacity="0.9"/>
+                    <path d="M24 12H26C27.1046 12 28 12.8954 28 14V26C28 27.1046 27.1046 28 26 28H24V12Z" fill="white" opacity="0.6"/>
+                    <defs>
+                        <linearGradient id="gradient" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#667eea"/>
+                            <stop offset="1" stop-color="#764ba2"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+                <h1>PDF Summarizer</h1>
+            </div>
+            <p class="subtitle">Powered by Google ADK & Ollama</p>
+        </header>
+
+        <main class="main-content">
+            <!-- Upload Section -->
+            <section class="upload-section" id="uploadSection">
+                <div class="upload-card">
+                    <div class="upload-icon">
+                        <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="32" cy="32" r="32" fill="url(#uploadGradient)" opacity="0.1"/>
+                            <path d="M32 20V44M32 20L24 28M32 20L40 28" stroke="url(#uploadGradient)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M20 44H44" stroke="url(#uploadGradient)" stroke-width="3" stroke-linecap="round"/>
+                            <defs>
+                                <linearGradient id="uploadGradient" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+                                    <stop stop-color="#667eea"/>
+                                    <stop offset="1" stop-color="#764ba2"/>
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                    </div>
+                    <h2>Upload Your PDF</h2>
+                    <p class="upload-description">Drag and drop your PDF file here, or click to browse</p>
+                    
+                    <div class="drop-zone" id="dropZone">
+                        <input type="file" id="fileInput" accept=".pdf" hidden>
+                        <button class="btn-primary" id="browseBtn">
+                            <span>Browse Files</span>
+                        </button>
+                        <p class="file-info">Maximum file size: 10MB</p>
+                    </div>
+                    
+                    <div class="selected-file" id="selectedFile" style="display: none;">
+                        <div class="file-icon">📄</div>
+                        <div class="file-details">
+                            <p class="file-name" id="fileName"></p>
+                            <p class="file-size" id="fileSize"></p>
+                        </div>
+                        <button class="btn-remove" id="removeBtn">✕</button>
+                    </div>
+                    
+                    <button class="btn-submit" id="submitBtn" style="display: none;">
+                        <span>Generate Summary</span>
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M4 10H16M16 10L12 6M16 10L12 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Loading Section -->
+            <section class="loading-section" id="loadingSection" style="display: none;">
+                <div class="loading-card">
+                    <div class="spinner"></div>
+                    <h3>Generating Summary...</h3>
+                    <p>Our AI agent is analyzing your PDF document</p>
+                    <div class="progress-steps">
+                        <div class="step active">
+                            <div class="step-icon">✓</div>
+                            <span>PDF Uploaded</span>
+                        </div>
+                        <div class="step active">
+                            <div class="step-icon">⟳</div>
+                            <span>Extracting Text</span>
+                        </div>
+                        <div class="step">
+                            <div class="step-icon">◯</div>
+                            <span>Generating Summary</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Summary Section -->
+            <section class="summary-section" id="summarySection" style="display: none;">
+                <div class="summary-card">
+                    <div class="summary-header">
+                        <h2>📝 Summary</h2>
+                        <div class="summary-meta">
+                            <span class="meta-item" id="pageCount"></span>
+                            <span class="meta-item" id="summaryFileName"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="summary-content" id="summaryContent"></div>
+                    
+                    <div class="summary-actions">
+                        <button class="btn-secondary" id="copyBtn">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M6 6V4C6 2.89543 6.89543 2 8 2H16C17.1046 2 18 2.89543 18 4V12C18 13.1046 17.1046 14 16 14H14M4 8H12C13.1046 8 14 8.89543 14 10V16C14 17.1046 13.1046 18 12 18H4C2.89543 18 2 17.1046 2 16V10C2 8.89543 2.89543 8 4 8Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <span>Copy Summary</span>
+                        </button>
+                        <button class="btn-primary" id="newSummaryBtn">
+                            <span>Summarize Another PDF</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Error Section -->
+            <section class="error-section" id="errorSection" style="display: none;">
+                <div class="error-card">
+                    <div class="error-icon">⚠️</div>
+                    <h3>Oops! Something went wrong</h3>
+                    <p class="error-message" id="errorMessage"></p>
+                    <button class="btn-primary" id="retryBtn">
+                        <span>Try Again</span>
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <p>Built with <span class="heart">❤️</span> using Google ADK, FastAPI & Ollama</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
