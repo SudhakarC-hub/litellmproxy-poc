@@ -1,21 +1,21 @@
 """
-PDF Summarizer Agent using Google ADK
+PDF Summarizer Agent using Google ADK via LiteLLM Proxy
 
-This module implements an ADK agent that generates summaries of PDF documents
-using a locally hosted Ollama LLM (Mistral model) via Google ADK framework.
+This module implements an ADK agent that generates summaries of PDF documents.
+All models are accessed through LiteLLM proxy (configured via proxy admin UI).
 """
 
 import os
 from google.adk.agents import Agent
 from google.adk.models import LiteLlm
 from dotenv import load_dotenv
+from .proxy_config import get_proxy_config, MODEL_NAME
 
 # Load environment variables
 load_dotenv()
 
-# Configuration
-MODEL_NAME = os.getenv("MODEL_NAME", "mistral")
-OLLAMA_API_BASE = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+# Get proxy configuration
+proxy_config = get_proxy_config()
 
 
 def summarize_pdf_text(pdf_text: str) -> str:
@@ -29,13 +29,18 @@ def summarize_pdf_text(pdf_text: str) -> str:
         A comprehensive summary of the PDF content
     """
     # This function will be called by the agent
-    # The actual summarization is handled by the LLM
+    # The actual summarization is handled by the LLM via proxy
     return pdf_text
 
 
-# Create the PDF Summarizer Agent using Google ADK
+# Create the PDF Summarizer Agent using Google ADK with LiteLLM Proxy
+# Note: Use 'openai/' prefix to tell LiteLLM to use proxy's OpenAI-compatible endpoint
 pdf_summarizer_agent = Agent(
-    model=LiteLlm(model=f"ollama_chat/{MODEL_NAME}"),
+    model=LiteLlm(
+        model=f"openai/{MODEL_NAME}",  # Prefix with 'openai/' for proxy
+        api_base=proxy_config["proxy_url"],
+        api_key=proxy_config["api_key"]
+    ),
     name="pdf_summarizer_agent",
     description=(
         "An expert document summarizer that analyzes PDF documents and generates "
@@ -66,6 +71,7 @@ Provide your summary directly without any preamble or meta-commentary.
 """,
     tools=[summarize_pdf_text]
 )
+
 
 
 async def get_pdf_summary(pdf_text: str) -> str:

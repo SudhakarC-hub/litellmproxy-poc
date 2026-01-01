@@ -1,537 +1,294 @@
-# PDF Summarizer Agent
+# PDF Summarizer Agent with LiteLLM Proxy
 
-A local PDF summarization system powered by **Google Agent Development Kit (ADK)**, **FastAPI**, and **Ollama** with the Mistral model. Upload PDFs through a modern web interface and get AI-generated summaries instantly.
+A FastAPI-based PDF summarizer using Google ADK agents with LiteLLM proxy for unified LLM access.
 
-## 🌟 Features
+## 🚀 Quick Start
 
-- **Modern Web Interface**: Beautiful, responsive UI with drag-and-drop file upload
-- **Local LLM Processing**: Uses Ollama with Mistral model for privacy and speed
-- **Google ADK Integration**: Leverages ADK for robust agent orchestration
-- **FastAPI Backend**: High-performance REST API with automatic documentation
-- **Real-time Processing**: Instant PDF text extraction and summarization
-- **Mac M5 Optimized**: Designed for Apple Silicon with 24GB RAM
+### Prerequisites
+- Python 3.11+
+- Docker & Docker Compose (for LiteLLM proxy)
+- Gemini API key (get from https://aistudio.google.com/app/apikey)
 
-## 📋 Prerequisites
-
-- **Python 3.11+** (installed in virtual environment)
-- **Ollama** (for local LLM hosting)
-- **Mac M5** with 24GB RAM (or similar hardware)
-
-## 🚀 Installation
-
-### 1. Install Ollama
+### 1. Install Dependencies
 
 ```bash
-# Install Ollama (if not already installed)
-curl -fsSL https://ollama.com/install.sh | sh
-
-# Pull the Mistral model
-ollama pull mistral
-```
-
-### 2. Set Up the Project
-
-```bash
-# Clone or navigate to the project directory
-cd /Users/sudhakarchigurupati/ADKProject/pdf_summary_adk_agent
-
-# Create and activate virtual environment
+# Create virtual environment
 python3 -m venv venv
-source venv/bin/activate
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install dependencies
+# Install requirements
 pip install -r requirements.txt
 ```
 
-### 3. Configure Environment
+### 2. Configure Environment
 
-The `.env` file is already configured with default settings:
+Create/update `.env` file:
 
-```env
-OLLAMA_BASE_URL=http://localhost:11434
-MODEL_NAME=mistral
+```bash
+# LiteLLM Proxy Configuration
+LITELLM_MASTER_KEY=sk-1234
+LITELLM_SALT_KEY=sk-1234
+LITELLM_PROXY_URL=http://localhost:4000
+
+# Model Selection (any model configured in proxy)
+MODEL_NAME=gemini-flash
+
+# Backend Configuration
 BACKEND_HOST=0.0.0.0
 BACKEND_PORT=8000
 MAX_FILE_SIZE_MB=10
-```
 
-Modify these values if needed.
 
-## 🎯 Usage
-
-### Start Ollama
-
-First, ensure Ollama is running:
+### 3. Start LiteLLM Proxy
 
 ```bash
-# Start Ollama server
-ollama serve
+# Start proxy with Docker Compose
+docker compose up -d
+
+# Verify proxy is running
+curl http://localhost:4000/health
+
+# Check available models
+curl http://localhost:4000/models -H "Authorization: Bearer sk-1234"
 ```
 
-Keep this terminal open.
+**Proxy URLs:**
+- API: http://localhost:4000
+- Admin UI: http://localhost:4000/ui
+- Prometheus: http://localhost:9090
 
-### Start the Backend
-
-In a new terminal:
+### 4. Start Backend Server
 
 ```bash
-# Navigate to project directory
-cd /Users/sudhakarchigurupati/ADKProject/pdf_summary_adk_agent
-
 # Activate virtual environment
 source venv/bin/activate
 
-# Start FastAPI server
+# Start server
 uvicorn backend.main:app --reload
 ```
 
-The API will be available at `http://localhost:8000`
+Server runs on: http://localhost:8000
 
-### Open the Frontend
+### 5. Test the Application
 
-**Option 1: Direct File Access**
-- Open `frontend/index.html` directly in your browser
+**Option A: Using Swagger UI**
+1. Visit http://localhost:8000/docs
+2. Click on `/upload` endpoint
+3. Upload a PDF file
+4. Get summary response
 
-**Option 2: Local Server (Recommended)**
+**Option B: Using curl**
 ```bash
-# In a new terminal, navigate to frontend directory
-cd /Users/sudhakarchigurupati/ADKProject/pdf_summary_adk_agent/frontend
-
-# Start a simple HTTP server
-python -m http.server 3000
+curl -X POST http://localhost:8000/upload \
+  -F "file=@your_document.pdf"
 ```
 
-Then open `http://localhost:3000` in your browser.
+## 📋 LiteLLM Proxy Setup Guide
 
-### Using the Application
+### Step 1: Configure Models
 
-1. **Upload PDF**: Drag and drop a PDF file or click "Browse Files"
-2. **Generate Summary**: Click "Generate Summary" button
-3. **View Results**: Read the AI-generated summary
-4. **Copy or Restart**: Copy the summary or process another PDF
+Edit `config.yaml` to define available models:
+
+```yaml
+model_list:
+  # Ollama Models (self-hosted)
+  - model_name: mistral
+    litellm_params:
+      model: ollama_chat/mistral
+      api_base: http://host.docker.internal:11434
+  
+  # Gemini Models
+  - model_name: gemini-flash
+    litellm_params:
+      model: gemini/gemini-2.5-flash-lite
+      api_key: os.environ/GEMINI_API_KEY
+  
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL
+```
+
+### Step 2: Start Proxy Services
+
+```bash
+# Start all services (proxy, database, prometheus)
+docker compose up -d
+
+# View logs
+docker compose logs -f litellm
+
+# Stop services
+docker compose down
+```
+
+### Step 3: Verify Proxy Configuration
+
+```bash
+# Test health endpoint
+curl http://localhost:4000/health
+
+# List available models
+curl http://localhost:4000/models \
+  -H "Authorization: Bearer sk-1234"
+
+# Test chat completion
+curl http://localhost:4000/v1/chat/completions \
+  -H "Authorization: Bearer sk-1234" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gemini-flash",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
+```
+
+### Step 4: Configure ADK Agent
+
+The agent is configured in `agent/agent.py`:
+
+```python
+from google.adk.models import LiteLlm
+from google.adk.agents import Agent
+
+pdf_summarizer_agent = Agent(
+    model=LiteLlm(
+        model=f"openai/{MODEL_NAME}",  # Uses OpenAI-compatible format
+        api_base=proxy_config["proxy_url"],
+        api_key=proxy_config["api_key"]
+    ),
+    name="pdf_summarizer_agent",
+    # ... agent configuration
+)
+```
+
+**Key Points:**
+- Use `openai/` prefix for model name (e.g., `openai/gemini-flash`)
+- Point to proxy URL (`http://localhost:4000`)
+- Use master key for authentication
+- API keys managed in proxy, not in application code
+
+### Step 5: Switch Models
+
+To use a different model, update `MODEL_NAME` in `.env`:
+
+```bash
+# Use Gemini Flash
+MODEL_NAME=gemini-flash
+
+# Use Ollama Mistral
+MODEL_NAME=mistral
+```
+
+Restart the backend server after changing models.
+
+## 🔧 Troubleshooting
+
+### Docker Daemon Not Running
+
+If you get `Cannot connect to the Docker daemon`:
+
+**Solution:**
+1. Start Docker Desktop application
+2. Wait for Docker to fully start (check the Docker icon in menu bar)
+3. Verify Docker is running: `docker ps`
+4. Then run: `docker compose up -d`
+
+### Proxy Won't Start
+
+```bash
+# Check if ports are in use
+lsof -ti:4000 | xargs kill -9  # Kill process on port 4000
+lsof -ti:8000 | xargs kill -9  # Kill process on port 8000
+
+# Check Docker logs
+docker compose logs litellm
+docker compose logs db
+```
+
+### Missing Dependencies
+
+If you get `ModuleNotFoundError: No module named 'backoff'`:
+
+```bash
+pip install 'litellm[proxy]'
+```
+
+### Ollama Models Not Working
+
+Ensure Ollama is running:
+
+```bash
+# Start Ollama
+ollama serve
+
+# Pull model
+ollama pull mistral
+
+# Test model
+ollama run mistral "Hello"
+```
+
+### Gemini API Errors
+
+1. Verify API key is valid at https://aistudio.google.com/
+2. Check `.env` has `GEMINI_API_KEY` set
+3. Restart proxy: `docker compose restart litellm`
 
 ## 📁 Project Structure
 
 ```
 pdf_summary_adk_agent/
-├── backend/
-│   ├── __init__.py
-│   ├── main.py              # FastAPI application
-│   └── pdf_extractor.py     # PDF text extraction utility
 ├── agent/
-│   ├── __init__.py
-│   ├── agent.py             # ADK agent implementation
-│   └── ollama_config.py     # Ollama configuration
-├── frontend/
-│   ├── index.html           # Web interface
-│   ├── styles.css           # Styling
-│   └── script.js            # Frontend logic
-├── .env                     # Environment configuration
-├── .gitignore              # Git ignore patterns
-├── requirements.txt         # Python dependencies
-└── README.md               # This file
+│   ├── agent.py           # ADK agent configuration
+│   └── proxy_config.py    # Proxy connection settings
+├── backend/
+│   ├── main.py           # FastAPI application
+│   └── pdf_extractor.py  # PDF text extraction
+├── config.yaml           # LiteLLM model configuration
+├── docker-compose.yml    # Proxy services
+├── .env                  # Environment variables
+├── requirements.txt      # Python dependencies
+└── README.md            # This file
 ```
 
-## 🔌 API Documentation
+## 🔑 Key Features
 
-### Endpoints
+- **Unified LLM Access**: Single API for multiple LLM providers (Gemini, Ollama, etc.)
+- **API Key Management**: Centralized key management in proxy
+- **Monitoring**: Built-in Prometheus metrics and admin UI
+- **OpenAI Compatible**: Standard OpenAI API format for all models
+- **Easy Model Switching**: Change models via environment variable
 
-#### `GET /`
-Root endpoint with API information.
+## 📚 API Endpoints
+
+### Health Check
+```bash
+GET http://localhost:8000/health
+```
+
+### Upload PDF
+```bash
+POST http://localhost:8000/upload
+Content-Type: multipart/form-data
+
+file: <PDF file>
+```
 
 **Response:**
 ```json
 {
-  "message": "PDF Summarizer Agent API",
-  "version": "1.0.0",
-  "docs": "/docs"
-}
-```
-
-#### `GET /health`
-Health check endpoint.
-
-**Response:**
-```json
-{
-  "status": "healthy",
-  "service": "pdf-summarizer-agent"
-}
-```
-
-#### `POST /upload`
-Upload a PDF and generate a summary.
-
-**Request:**
-- Content-Type: `multipart/form-data`
-- Body: PDF file (max 10MB)
-
-**Response:**
-```json
-{
-  "summary": "AI-generated summary text...",
+  "summary": "Generated summary text...",
   "page_count": 5,
   "file_name": "document.pdf"
 }
 ```
 
-**Error Response:**
-```json
-{
-  "detail": "Error message"
-}
-```
+## 🔗 Resources
 
-### Interactive API Docs
-
-Visit `http://localhost:8000/docs` for Swagger UI documentation.
-
-## 🛠️ Technology Stack
-
-- **Backend**: FastAPI, Python 3.11+
-- **Agent Framework**: Google ADK
-- **LLM**: Ollama (Mistral model)
-- **PDF Processing**: PyMuPDF (fitz)
-- **Frontend**: HTML5, CSS3, Vanilla JavaScript
-- **Server**: Uvicorn (ASGI)
-
-## 🔧 Troubleshooting
-
-### Ollama Connection Issues
-
-```bash
-# Check if Ollama is running
-curl http://localhost:11434/api/tags
-
-# Restart Ollama
-killall ollama
-ollama serve
-```
-
-### Model Not Found
-
-```bash
-# List available models
-ollama list
-
-# Pull Mistral model
-ollama pull mistral
-```
-
-### Backend Errors
-
-```bash
-# Check backend logs
-# Ensure virtual environment is activated
-source venv/bin/activate
-
-# Reinstall dependencies
-pip install -r requirements.txt --upgrade
-```
-
-### CORS Issues
-
-If the frontend can't connect to the backend:
-- Ensure backend is running on `http://localhost:8000`
-- Check browser console for errors
-- Verify `script.js` has correct `API_BASE_URL`
-
-## 🎨 Features Highlights
-
-### Modern UI/UX
-- Dark mode with glassmorphism effects
-- Smooth animations and transitions
-- Responsive design for all screen sizes
-- Drag-and-drop file upload
-- Real-time progress indicators
-
-### Robust Error Handling
-- File type validation (PDF only)
-- File size limits (10MB default)
-- Comprehensive error messages
-- Graceful fallback mechanisms
-
-### Performance Optimizations
-- Async/await for non-blocking operations
-- Temporary file cleanup
-- Efficient text extraction
-- Optimized for Mac M5 hardware
+- [LiteLLM Documentation](https://docs.litellm.ai/)
+- [Google ADK Documentation](https://google.github.io/adk/)
+- [Gemini API](https://ai.google.dev/)
+- [FastAPI Documentation](https://fastapi.tiangolo.com/)
 
 ## 📝 License
 
-This project is open source and available for educational and commercial use.
-
-## 🤝 Contributing
-
-Contributions are welcome! Feel free to submit issues or pull requests.
-
-## 📧 Support
-
-For issues or questions, please open an issue in the repository.
-
-## 🛑 Stopping Servers
-
-When you're done using the application, you can stop all running servers:
-
-### Stop Backend Server
-
-If running in foreground (with `--reload`):
-```bash
-# Press CTRL+C in the terminal where uvicorn is running
-```
-
-If running in background or need to force stop:
-```bash
-# Find and kill the uvicorn process
-pkill -f "uvicorn backend.main:app"
-
-# Or find the process ID and kill it
-ps aux | grep uvicorn
-kill <PID>
-```
-
-### Stop Frontend Server
-
-If you started a Python HTTP server:
-```bash
-# Press CTRL+C in the terminal where the server is running
-```
-
-Or force stop:
-```bash
-# Kill Python HTTP server on port 3000
-lsof -ti:3000 | xargs kill -9
-
-# Or for port 3001
-lsof -ti:3001 | xargs kill -9
-```
-
-### Stop Ollama
-
-```bash
-# Stop Ollama server
-killall ollama
-
-# Or use pkill
-pkill -f ollama
-```
-
-### Stop All Servers at Once
-
-```bash
-# Stop all related processes
-pkill -f "uvicorn backend.main:app"
-pkill -f "http.server"
-killall ollama
-
-# Verify all stopped
-ps aux | grep -E "uvicorn|http.server|ollama"
-```
-
-### Deactivate Virtual Environment
-
-```bash
-# When done, deactivate the Python virtual environment
-deactivate
-```
-
-## 🔧 ADK Integration Troubleshooting
-
-This section documents common issues encountered when integrating Google ADK with Ollama and their solutions.
-
-### Issue 1: Import Path Error
-
-**Error:**
-```
-ModuleNotFoundError: No module named 'google.adk.llms'
-```
-
-**Solution:**
-The correct import path for LiteLlm is:
-```python
-from google.adk.models import LiteLlm  # ✅ Correct
-# NOT: from google.adk.llms import LiteLlm  # ❌ Wrong
-```
-
-### Issue 2: Missing Session Service
-
-**Error:**
-```
-Runner.__init__() missing 1 required keyword-only argument: 'session_service'
-```
-
-**Solution:**
-ADK Runner requires a session service for managing conversation state:
-```python
-from google.adk.sessions import InMemorySessionService
-
-session_service = InMemorySessionService()
-runner = Runner(
-    app_name="your_app",
-    agent=your_agent,
-    session_service=session_service  # Required!
-)
-```
-
-### Issue 3: Missing App Name
-
-**Error:**
-```
-Either app or both app_name and agent must be provided
-```
-
-**Solution:**
-When providing an agent to Runner, you must also provide `app_name`:
-```python
-runner = Runner(
-    app_name="pdf_summarizer",  # Required when using agent
-    agent=pdf_summarizer_agent,
-    session_service=session_service
-)
-```
-
-### Issue 4: Incorrect Message Format
-
-**Error:**
-```
-Runner.run() takes 1 positional argument but 2 were given
-```
-
-**Solution:**
-Don't pass a string directly. Use `types.Content` format:
-```python
-from google.genai import types
-
-# ❌ Wrong
-response = runner.run(prompt_string)
-
-# ✅ Correct
-new_message = types.Content(
-    role='user',
-    parts=[types.Part(text=prompt_string)]
-)
-response = runner.run(
-    user_id="user_id",
-    session_id="session_id",
-    new_message=new_message
-)
-```
-
-### Issue 5: Session Not Found
-
-**Error:**
-```
-ValueError: Session not found: session_id
-```
-
-**Solution:**
-You must create the session before using it:
-```python
-# Create session first
-await session_service.create_session(
-    app_name="pdf_summarizer",
-    user_id="user_id",
-    session_id="session_id"
-)
-
-# Then run the agent
-async for event in runner.run_async(
-    user_id="user_id",
-    session_id="session_id",
-    new_message=new_message
-):
-    # Process events
-```
-
-### Issue 6: Async/Await Required (Critical!)
-
-**Error:**
-Session still not found even after calling `create_session()`
-
-**Root Cause:**
-`create_session()` is an **async** function. If you don't `await` it, the session is never actually created.
-
-**Solution:**
-Always use `await` with async ADK methods:
-```python
-# ❌ Wrong - session never created
-session_service.create_session(app_name, user_id, session_id)
-
-# ✅ Correct - properly awaited
-await session_service.create_session(app_name, user_id, session_id)
-
-# Also use run_async instead of run
-async for event in runner.run_async(...):  # ✅ Correct
-    # Process events
-```
-
-### Complete Working Pattern
-
-Here's the complete pattern that works:
-
-```python
-import uuid
-from google.adk.agents import Agent
-from google.adk.models import LiteLlm
-from google.adk.runners import Runner
-from google.adk.sessions import InMemorySessionService
-from google.genai import types
-
-async def generate_summary(text: str) -> str:
-    # 1. Create session service
-    session_service = InMemorySessionService()
-    
-    # 2. Generate unique IDs
-    user_id = "pdf_user"
-    session_id = f"session_{uuid.uuid4().hex[:8]}"
-    app_name = "pdf_summarizer"
-    
-    # 3. Create session (async!)
-    await session_service.create_session(
-        app_name=app_name,
-        user_id=user_id,
-        session_id=session_id
-    )
-    
-    # 4. Create Runner
-    runner = Runner(
-        app_name=app_name,
-        agent=your_agent,
-        session_service=session_service
-    )
-    
-    # 5. Format message
-    new_message = types.Content(
-        role='user',
-        parts=[types.Part(text=text)]
-    )
-    
-    # 6. Run agent (async!)
-    response_text = ""
-    async for event in runner.run_async(
-        user_id=user_id,
-        session_id=session_id,
-        new_message=new_message
-    ):
-        if hasattr(event, 'content') and event.content:
-            if hasattr(event.content, 'parts'):
-                for part in event.content.parts:
-                    if hasattr(part, 'text') and part.text:
-                        response_text += part.text
-    
-    return response_text
-```
-
-### Key Takeaways
-
-1. **Import Path**: Use `google.adk.models.LiteLlm`
-2. **Session Service**: Always required for Runner
-3. **App Name**: Required when providing an agent
-4. **Message Format**: Use `types.Content` with role and parts
-5. **Session Creation**: Must create session before use
-6. **Async/Await**: Critical - `await create_session()` and use `run_async()`
-7. **Event Processing**: Iterate through events to collect response
-
----
-
-**Built with ❤️ using Google ADK, FastAPI & Ollama**
+MIT License
