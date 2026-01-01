@@ -3,8 +3,8 @@
 #   # Ollama Models (self-hosted)
 #   - model_name: mistral
 #     litellm_params:
-#       model: ollama_chat/mistral
-#       api_base: http://host.docker.internal:11434
+#       model: ollama/mistral
+#       api_base: http://localhost:11434
   
   
 #   # Gemini Models

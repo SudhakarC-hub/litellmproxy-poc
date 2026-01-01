@@ -95,13 +95,12 @@ model_list:
   - model_name: mistral
     litellm_params:
       model: ollama_chat/mistral
-      api_base: http://host.docker.internal:11434
+      api_base: http://localhost:11434
   
   # Gemini Models
   - model_name: gemini-flash
     litellm_params:
       model: gemini/gemini-2.5-flash-lite
-      api_key: os.environ/GEMINI_API_KEY
   
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
